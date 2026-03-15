@@ -1,0 +1,2464 @@
+html<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>La Máscara de Linux</title>
+
+<style>
+
+body{
+font-family:Arial;
+background-image:url("https://i.imgur.com/uPMrnVT.gif");
+background-size:cover;
+background-position:center;
+background-repeat:no-repeat;
+background-attachment:fixed;
+color:white;
+text-align:center;
+overflow-x:hidden;
+}
+
+#efectos{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+pointer-events:none;
+}
+
+#tux{
+width:400px;
+display:block;
+margin:100px auto;
+}
+
+.tuxJuego{
+width:400px;
+display:block;
+margin:100px auto;
+}
+
+.tuxInicio{
+width:400px;
+display:block;
+margin:100px auto;
+border-radius:100px;
+}
+
+.container{
+margin-top:40px;
+animation:fade 0.7s;
+}
+
+@keyframes fade{
+from{opacity:0; transform:translateY(20px);}
+to{opacity:1; transform:translateY(0);}
+}
+
+input,button{
+padding:10px;
+margin:10px;
+font-size:16px;
+}
+
+button{
+background:#22c55e;
+border:none;
+color:white;
+cursor:pointer;
+border-radius:6px;
+transition:transform 0.2s;
+}
+
+button:hover{
+transform:scale(1.1);
+background:#16a34a;
+}
+
+#juego,#opciones,#final,#ranking{
+display:none;
+}
+
+#pista{
+font-size:22px;
+margin:30px;
+color:#38bdf8;
+min-height:40px;
+}
+
+.barra{
+width:300px;
+height:15px;
+background:#334155;
+margin:auto;
+border-radius:10px;
+overflow:hidden;
+}
+
+#barraTiempo{
+height:100%;
+width:100%;
+background:#22c55e;
+transition:width 1s linear;
+}
+
+table{
+margin:auto;
+border-collapse:collapse;
+}
+
+td,th{
+padding:8px 15px;
+border-bottom:1px solid #555;
+}
+
+.roto{
+animation:pantallaRota 0.5s;
+}
+
+@keyframes pantallaRota{
+
+0%{transform:scale(1);}
+20%{transform:scale(1.02) rotate(1deg);}
+40%{transform:scale(0.98) rotate(-1deg);}
+60%{transform:scale(1.02) rotate(1deg);}
+80%{transform:scale(0.99);}
+100%{transform:scale(1);}
+
+}
+
+#logroBox{
+position:fixed;
+top:20px;
+right:20px;
+background:#111827;
+color:white;
+padding:15px 25px;
+border-radius:10px;
+display:none;
+box-shadow:0 0 15px #000;
+animation:apareceLogro 0.5s;
+z-index:9999;
+}
+
+@keyframes apareceLogro{
+from{transform:translateX(200px);opacity:0;}
+to{transform:translateX(0);opacity:1;}
+}
+
+</style>
+</head>
+
+<body>
+
+    <canvas id="efectos"></canvas>
+
+
+<h1>🎭 La Máscara de Linux</h1>
+<div id="registro" class="container">
+<img class="tuxInicio" src="https://i.imgur.com/0vXT1My.jpeg">
+<input id="nombre" placeholder="Nombre" required><br>
+
+<p>Selecciona dificultad</p>
+
+<button onclick="seleccionarDificultad('normal')">Normal</button>
+<button onclick="seleccionarDificultad('dificil')">Difícil</button>
+<button onclick="seleccionarDificultad('profesional')">Profesional</button>
+<button onclick="iniciarJuego()">Comenzar</button>
+
+</div>
+
+<div id="juego" class="container">
+
+<h2>Adivina el personaje</h2>
+
+<p id="pista"></p>
+
+<div class="barra">
+<div id="barraTiempo"></div>
+</div>
+
+<p>Tiempo: <span id="tiempo">10</span></p>
+<br>
+
+<img id="tux" class="tuxJuego"
+src="https://i.imgur.com/ZvEvZKc.jpeg">
+
+</div>
+
+<div id="opciones" class="container">
+
+<h2>¿Quién es?</h2>
+
+<button onclick="responder(this)"></button><br>
+<button onclick="responder(this)"></button><br>
+<button onclick="responder(this)"></button><br>
+<button onclick="responder(this)"></button>
+
+<p id="resultado"></p>
+
+<button onclick="siguienteRonda()">Siguiente</button>
+
+<p id="puntos">Puntos: 0</p>
+<p id="comboTexto"></p>
+<p id="ronda">Ronda 1 / 8</p>
+
+</div>
+
+<div id="final" class="container">
+
+<h2>Juego terminado</h2>
+
+<p id="puntajeFinal"></p>
+
+<button onclick="mostrarRanking()">Ver Ranking</button>
+<button onclick="location.reload()">Jugar otra vez</button>
+
+</div>
+
+<div id="ranking" class="container">
+
+<h2>🏆 Ranking</h2>
+
+<table id="tablaRanking">
+<tr>
+<th>Jugador</th>
+<th>Puntos</th>
+</tr>
+</table>
+
+<button onclick="location.reload()">Volver</button>
+
+</div>
+
+<audio id="musicaFondo" loop>
+<source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3">
+</audio>
+
+<audio id="correcto">
+<source src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3">
+</audio>
+
+<audio id="error">
+<source src="https://assets.mixkit.co/active_storage/sfx/2955/2955-preview.mp3">
+</audio>
+
+<script>
+    
+    let tux=document.getElementById("tux")
+
+function tuxPensando(){
+
+tux.src="https://i.imgur.com/ZvEvZKc.jpeg"
+
+}
+
+function mostrarTuxGigante(imagen){
+
+let cont=document.getElementById("tuxReaccion")
+let img=document.getElementById("tuxReaccionImg")
+
+img.src=imagen
+cont.style.display="flex"
+
+setTimeout(()=>{
+cont.style.display="none"
+},3000)
+
+}
+
+function tuxFeliz(){
+
+tux.src="https://i.imgur.com/Rk9Xe1d.png"
+mostrarTuxGigante("https://i.imgur.com/Rk9Xe1d.png")
+
+}
+
+function tuxTriste(){
+
+tux.src="https://i.imgur.com/ktA7fFu.jpeg"
+mostrarTuxGigante("https://i.imgur.com/ktA7fFu.jpeg")
+
+}
+
+let puntos=0
+let ronda=1
+let totalRondas=8
+let preguntaRespondida=false
+let combo=0
+let logros={
+primerAcierto:false,
+combo3:false,
+combo5:false,
+experto:false
+}
+let personajeCorrecto
+let pistasActuales
+let jugador=""
+let dificultad="normal"
+
+function seleccionarDificultad(nivel){
+
+dificultad=nivel
+
+document.getElementById("registro").style.display="block"
+
+}
+
+const personajes=[
+
+{
+nombre:"Linus Torvalds",
+normal:[
+"Creó el kernel de Linux",
+"Nació en Finlandia",
+"También creó Git",
+"Comenzó Linux como un proyecto personal",
+"Es el mantenedor principal del kernel"
+],
+dificil:[
+"Creador del kernel Linux",
+"Programador finlandés",
+"Creador de Git"
+],
+profesional:[
+"Creador del kernel Linux"
+]
+},
+
+{
+nombre:"Greg Kroah-Hartman",
+normal:[
+"Mantenedor del kernel Linux",
+"Responsable de versiones estables",
+"Experto en drivers",
+"Trabaja con la Linux Foundation",
+"Contribuidor clave del kernel"
+],
+dificil:[
+"Mantenedor del kernel",
+"Responsable de versiones estables",
+"Experto en drivers Linux"
+],
+profesional:[
+"Mantenedor de versiones estables del kernel"
+]
+},
+
+{
+nombre:"Andrew Morton",
+normal:[
+"Desarrollador del kernel Linux",
+"Especialista en memoria del kernel",
+"Colabora con Linus Torvalds",
+"Mantiene parches importantes",
+"Figura clave del desarrollo"
+],
+dificil:[
+"Desarrollador del kernel",
+"Especialista en memoria Linux",
+"Colaborador de Torvalds"
+],
+profesional:[
+"Mantenedor de memoria del kernel Linux"
+]
+},
+
+{
+nombre:"Alan Cox",
+normal:[
+"Histórico desarrollador del kernel",
+"Trabajó con Red Hat",
+"Programador británico",
+"Contribuyó durante muchos años",
+"Figura influyente en Linux"
+],
+dificil:[
+"Desarrollador histórico del kernel",
+"Trabajó con Red Hat",
+"Programador británico"
+],
+profesional:[
+"Desarrollador histórico del kernel Linux"
+]
+},
+
+{
+nombre:"Theodore Ts'o",
+normal:[
+"Desarrollador del kernel Linux",
+"Creador de sistemas de archivos ext",
+"Experto en almacenamiento",
+"Contribuidor histórico",
+"Trabajó en ext2 ext3 ext4"
+],
+dificil:[
+"Creador de ext2 ext3 ext4",
+"Desarrollador del kernel",
+"Experto en sistemas de archivos"
+],
+profesional:[
+"Creador de ext4"
+]
+},
+
+{
+nombre:"Ingo Molnar",
+normal:[
+"Desarrollador del kernel",
+"Experto en scheduling",
+"Contribuyó al planificador de Linux",
+"Trabajó con Red Hat",
+"Figura clave del rendimiento del kernel"
+],
+dificil:[
+"Experto en scheduling",
+"Desarrollador del kernel",
+"Trabajó con Red Hat"
+],
+profesional:[
+"Desarrollador del scheduler de Linux"
+]
+},
+
+{
+nombre:"Thomas Gleixner",
+normal:[
+"Desarrollador del kernel",
+"Experto en tiempo real",
+"Trabajó en RT Linux",
+"Colaborador del kernel",
+"Influyó en sistemas embebidos"
+],
+dificil:[
+"Experto en tiempo real",
+"Desarrollador del kernel",
+"Trabajó en RT Linux"
+],
+profesional:[
+"Desarrollador de Linux en tiempo real"
+]
+},
+
+{
+nombre:"Peter Zijlstra",
+normal:[
+"Desarrollador del kernel",
+"Especialista en scheduling",
+"Trabaja con Red Hat",
+"Colabora en rendimiento del sistema",
+"Contribuidor del kernel"
+],
+dificil:[
+"Especialista en scheduling",
+"Desarrollador del kernel",
+"Trabaja con Red Hat"
+],
+profesional:[
+"Experto en scheduling del kernel"
+]
+},
+
+{
+nombre:"Arnd Bergmann",
+normal:[
+"Desarrollador del kernel",
+"Especialista en arquitecturas",
+"Trabaja con ARM",
+"Contribuye al kernel Linux",
+"Experto en portabilidad"
+],
+dificil:[
+"Experto en arquitecturas ARM",
+"Desarrollador del kernel",
+"Especialista en portabilidad"
+],
+profesional:[
+"Experto en arquitecturas del kernel"
+]
+},
+
+{
+nombre:"Dave Hansen",
+normal:[
+"Desarrollador del kernel Linux",
+"Especialista en memoria",
+"Trabaja con Intel",
+"Contribuye al rendimiento del sistema",
+"Programador del kernel"
+],
+dificil:[
+"Especialista en memoria",
+"Desarrollador del kernel",
+"Trabaja con Intel"
+],
+profesional:[
+"Experto en memoria del kernel"
+]
+},
+
+{
+nombre:"Rafael Wysocki",
+normal:[
+"Desarrollador del kernel",
+"Especialista en gestión de energía",
+"Trabaja con Intel",
+"Contribuye a power management",
+"Programador del kernel"
+],
+dificil:[
+"Especialista en energía",
+"Desarrollador del kernel",
+"Trabaja con Intel"
+],
+profesional:[
+"Experto en power management de Linux"
+]
+},
+
+{
+nombre:"Steven Rostedt",
+normal:[
+"Desarrollador del kernel",
+"Experto en tracing",
+"Trabajó con Red Hat",
+"Contribuye a herramientas de diagnóstico",
+"Programador Linux"
+],
+dificil:[
+"Experto en tracing",
+"Desarrollador del kernel",
+"Trabajó con Red Hat"
+],
+profesional:[
+"Experto en tracing del kernel"
+]
+},
+
+{
+nombre:"Jonathan Corbet",
+normal:[
+"Editor de Linux Weekly News",
+"Desarrollador del kernel",
+"Escritor técnico",
+"Explica el desarrollo del kernel",
+"Figura influyente en la comunidad"
+],
+dificil:[
+"Editor de LWN",
+"Desarrollador del kernel",
+"Escritor técnico"
+],
+profesional:[
+"Editor de Linux Weekly News"
+]
+},
+
+{
+nombre:"David Miller",
+normal:[
+"Desarrollador del kernel",
+"Experto en redes",
+"Mantenedor del stack de red",
+"Trabajó con Sun Microsystems",
+"Figura clave del networking Linux"
+],
+dificil:[
+"Experto en redes",
+"Mantenedor del stack de red",
+"Desarrollador del kernel"
+],
+profesional:[
+"Mantenedor del networking del kernel"
+]
+},
+
+{
+nombre:"Alexey Kuznetsov",
+normal:[
+"Desarrollador del kernel",
+"Experto en networking",
+"Influyó en el stack de red",
+"Programador Linux",
+"Contribuidor histórico"
+],
+dificil:[
+"Experto en networking",
+"Desarrollador del kernel",
+"Contribuidor histórico"
+],
+profesional:[
+"Pionero del networking en Linux"
+]
+},
+
+{
+nombre:"Jesper Dangaard Brouer",
+normal:[
+"Desarrollador del kernel",
+"Experto en networking",
+"Trabaja en rendimiento de red",
+"Colabora con Red Hat",
+"Contribuidor Linux"
+],
+dificil:[
+"Experto en networking",
+"Desarrollador del kernel",
+"Especialista en rendimiento"
+],
+profesional:[
+"Experto en networking del kernel"
+]
+},
+
+{
+nombre:"Jakub Kicinski",
+normal:[
+"Desarrollador del kernel",
+"Especialista en networking",
+"Trabaja en drivers de red",
+"Contribuidor del kernel",
+"Programador Linux"
+],
+dificil:[
+"Especialista en networking",
+"Desarrollador del kernel",
+"Trabaja en drivers"
+],
+profesional:[
+"Experto en drivers de red Linux"
+]
+},
+
+{
+nombre:"Herbert Xu",
+normal:[
+"Desarrollador del kernel",
+"Experto en criptografía",
+"Trabaja en seguridad Linux",
+"Contribuye al kernel",
+"Programador del sistema"
+],
+dificil:[
+"Experto en criptografía",
+"Desarrollador del kernel",
+"Especialista en seguridad"
+],
+profesional:[
+"Experto en criptografía del kernel"
+]
+},
+
+{
+nombre:"James Bottomley",
+normal:[
+"Desarrollador del kernel",
+"Experto en almacenamiento",
+"Trabajó con HP",
+"Contribuyó a drivers de storage",
+"Programador Linux"
+],
+dificil:[
+"Experto en almacenamiento",
+"Desarrollador del kernel",
+"Trabajó con HP"
+],
+profesional:[
+"Experto en almacenamiento del kernel"
+]
+},
+
+{
+nombre:"Kent Overstreet",
+normal:[
+"Desarrollador del kernel",
+"Creador del sistema de archivos bcachefs",
+"Programador Linux",
+"Experto en almacenamiento",
+"Contribuidor del kernel"
+],
+dificil:[
+"Creador de bcachefs",
+"Desarrollador del kernel",
+"Experto en almacenamiento"
+],
+profesional:[
+"Creador de bcachefs"
+]
+},
+
+{
+nombre:"Christoph Hellwig",
+normal:[
+"Desarrollador del kernel",
+"Especialista en almacenamiento",
+"Contribuye a NVMe",
+"Programador Linux",
+"Experto en sistemas de archivos"
+],
+dificil:[
+"Especialista en almacenamiento",
+"Desarrollador del kernel",
+"Experto en NVMe"
+],
+profesional:[
+"Experto en almacenamiento Linux"
+]
+},
+
+{
+nombre:"Al Viro",
+normal:[
+"Desarrollador del kernel",
+"Experto en sistemas de archivos",
+"Contribuye al VFS",
+"Programador Linux",
+"Figura técnica del kernel"
+],
+dificil:[
+"Experto en VFS",
+"Desarrollador del kernel",
+"Especialista en sistemas de archivos"
+],
+profesional:[
+"Experto en VFS de Linux"
+]
+},
+
+{
+nombre:"Miklos Szeredi",
+normal:[
+"Desarrollador del kernel",
+"Creador de FUSE",
+"Especialista en sistemas de archivos",
+"Programador Linux",
+"Contribuidor del kernel"
+],
+dificil:[
+"Creador de FUSE",
+"Desarrollador del kernel",
+"Experto en sistemas de archivos"
+],
+profesional:[
+"Creador de FUSE"
+]
+},
+
+{
+nombre:"Tejun Heo",
+normal:[
+"Desarrollador del kernel",
+"Experto en control groups",
+"Trabaja en cgroups",
+"Programador Linux",
+"Contribuidor del kernel"
+],
+dificil:[
+"Experto en cgroups",
+"Desarrollador del kernel",
+"Programador Linux"
+],
+profesional:[
+"Experto en cgroups del kernel"
+]
+},
+
+{
+nombre:"Paul McKenney",
+normal:[
+"Desarrollador del kernel",
+"Experto en concurrencia",
+"Creador de RCU",
+"Programador Linux",
+"Investigador del kernel"
+],
+dificil:[
+"Creador de RCU",
+"Experto en concurrencia",
+"Desarrollador del kernel"
+],
+profesional:[
+"Creador de RCU"
+]
+},
+
+{
+nombre:"Dan Williams",
+normal:[
+"Desarrollador del kernel",
+"Especialista en memoria persistente",
+"Trabaja con Intel",
+"Contribuye a almacenamiento",
+"Programador Linux"
+],
+dificil:[
+"Especialista en memoria persistente",
+"Desarrollador del kernel",
+"Trabaja con Intel"
+],
+profesional:[
+"Experto en memoria persistente Linux"
+]
+},
+
+{
+nombre:"Sasha Levin",
+normal:[
+"Desarrollador del kernel",
+"Trabaja en versiones estables",
+"Contribuidor Linux",
+"Colabora con mantenedores",
+"Programador del kernel"
+],
+dificil:[
+"Trabaja en kernel estable",
+"Desarrollador Linux",
+"Colaborador del kernel"
+],
+profesional:[
+"Mantenedor de kernel estable"
+]
+},
+
+{
+nombre:"Kees Cook",
+normal:[
+"Desarrollador del kernel",
+"Experto en seguridad",
+"Trabajó con Google",
+"Contribuye a protección del sistema",
+"Programador Linux"
+],
+dificil:[
+"Experto en seguridad",
+"Desarrollador del kernel",
+"Trabajó con Google"
+],
+profesional:[
+"Experto en seguridad del kernel"
+]
+},
+
+{
+nombre:"Matthew Garrett",
+normal:[
+"Desarrollador del kernel",
+"Experto en seguridad",
+"Trabajó con Red Hat",
+"Especialista en UEFI",
+"Contribuidor Linux"
+],
+dificil:[
+"Experto en UEFI",
+"Desarrollador del kernel",
+"Trabajó con Red Hat"
+],
+profesional:[
+"Experto en UEFI Linux"
+]
+},
+
+{
+nombre:"Borislav Petkov",
+normal:[
+"Desarrollador del kernel",
+"Especialista en arquitectura x86",
+"Trabaja en AMD",
+"Programador Linux",
+"Contribuidor del kernel"
+],
+dificil:[
+"Especialista en x86",
+"Desarrollador del kernel",
+"Trabaja en AMD"
+],
+profesional:[
+"Experto en arquitectura x86 Linux"
+]
+},
+
+{
+nombre:"Mark Shuttleworth",
+normal:[
+"Fundador de Ubuntu",
+"Empresario sudafricano",
+"Creó la empresa Canonical",
+"Promotor de Linux en escritorio",
+"Fue el primer africano en viajar al espacio como turista"
+],
+dificil:[
+"Fundador de Ubuntu",
+"Creador de Canonical",
+"Empresario sudafricano"
+],
+profesional:[
+"Fundador de Ubuntu"
+]
+},
+
+{
+nombre:"Ian Murdock",
+normal:[
+"Fundador de Debian",
+"Creó una de las distribuciones más influyentes",
+"Influyó en Ubuntu",
+"Promotor del software libre",
+"Programador del ecosistema Linux"
+],
+dificil:[
+"Fundador de Debian",
+"Influyó en muchas distribuciones",
+"Promotor del software libre"
+],
+profesional:[
+"Fundador de Debian"
+]
+},
+
+{
+nombre:"Patrick Volkerding",
+normal:[
+"Creador de Slackware Linux",
+"Una de las distribuciones más antiguas",
+"Administrador de sistemas",
+"Promotor del software libre",
+"Figura histórica de Linux"
+],
+dificil:[
+"Creador de Slackware",
+"Administrador Linux",
+"Desarrollador histórico"
+],
+profesional:[
+"Creador de Slackware"
+]
+},
+
+{
+nombre:"Judd Vinet",
+normal:[
+"Creador de Arch Linux",
+"Promotor de sistemas simples",
+"Administrador de sistemas",
+"Influyó en distros modernas",
+"Figura importante en Arch"
+],
+dificil:[
+"Creador de Arch Linux",
+"Promotor de simplicidad",
+"Administrador Linux"
+],
+profesional:[
+"Creador de Arch Linux"
+]
+},
+
+{
+nombre:"Daniel Robbins",
+normal:[
+"Creador de Gentoo Linux",
+"Promotor del sistema basado en compilación",
+"Administrador Linux",
+"Influyó en sistemas avanzados",
+"Desarrollador de distribuciones"
+],
+dificil:[
+"Creador de Gentoo",
+"Promotor del sistema compilado",
+"Administrador Linux"
+],
+profesional:[
+"Creador de Gentoo Linux"
+]
+},
+
+{
+nombre:"Bob Young",
+normal:[
+"Co-fundador de Red Hat",
+"Empresario canadiense",
+"Promotor del open source",
+"Figura clave del negocio Linux",
+"Influyó en Linux empresarial"
+],
+dificil:[
+"Co-fundador de Red Hat",
+"Empresario open source",
+"Promotor del software libre"
+],
+profesional:[
+"Co-fundador de Red Hat"
+]
+},
+
+{
+nombre:"Marc Ewing",
+normal:[
+"Co-fundador de Red Hat",
+"Programador estadounidense",
+"Creó una de las primeras distros comerciales",
+"Influyó en Linux empresarial",
+"Desarrollador del ecosistema Linux"
+],
+dificil:[
+"Co-fundador de Red Hat",
+"Programador estadounidense",
+"Figura del Linux empresarial"
+],
+profesional:[
+"Co-fundador de Red Hat"
+]
+},
+
+{
+nombre:"Warren Woodford",
+normal:[
+"Creador de MEPIS Linux",
+"Desarrollador de distribuciones",
+"Promotor del escritorio Linux",
+"Administrador Linux",
+"Figura del ecosistema Linux"
+],
+dificil:[
+"Creador de MEPIS",
+"Desarrollador Linux",
+"Administrador de sistemas"
+],
+profesional:[
+"Creador de MEPIS Linux"
+]
+},
+
+{
+nombre:"Philippe Ombredanne",
+normal:[
+"Participó en el desarrollo de distribuciones Linux",
+"Programador open source",
+"Contribuidor del ecosistema Linux",
+"Promotor del software libre",
+"Desarrollador tecnológico"
+],
+dificil:[
+"Programador open source",
+"Contribuidor Linux",
+"Promotor del software libre"
+],
+profesional:[
+"Desarrollador del ecosistema Linux"
+]
+},
+
+{
+nombre:"Gaël Duval",
+normal:[
+"Creador de Mandrake Linux",
+"Programador francés",
+"Promotor del escritorio Linux",
+"Mandrake fue muy popular en los 2000",
+"Figura histórica de Linux"
+],
+dificil:[
+"Creador de Mandrake Linux",
+"Programador francés",
+"Promotor del escritorio Linux"
+],
+profesional:[
+"Creador de Mandrake Linux"
+]
+},
+
+{
+nombre:"Con Kolivas",
+normal:[
+"Desarrollador Linux",
+"Creó proyectos de rendimiento",
+"Influyó en distribuciones",
+"Programador del ecosistema Linux",
+"Especialista en rendimiento"
+],
+dificil:[
+"Experto en rendimiento Linux",
+"Desarrollador open source",
+"Programador del ecosistema Linux"
+],
+profesional:[
+"Experto en rendimiento Linux"
+]
+},
+
+{
+nombre:"Robert Love",
+normal:[
+"Desarrollador del kernel Linux",
+"Trabajó con Red Hat",
+"Autor de libros sobre Linux",
+"Programador del ecosistema Linux",
+"Figura técnica importante"
+],
+dificil:[
+"Desarrollador del kernel",
+"Autor sobre Linux",
+"Trabajó con Red Hat"
+],
+profesional:[
+"Autor de Linux Kernel Development"
+]
+},
+
+{
+nombre:"Sam Varghese",
+normal:[
+"Promotor del software libre",
+"Periodista tecnológico",
+"Escritor sobre Linux",
+"Figura de la comunidad open source",
+"Apoya el ecosistema Linux"
+],
+dificil:[
+"Periodista de software libre",
+"Escritor tecnológico",
+"Promotor del open source"
+],
+profesional:[
+"Periodista del software libre"
+]
+},
+
+{
+nombre:"Jon Hall",
+normal:[
+"Conocido como Maddog",
+"Promotor de Linux",
+"Embajador del software libre",
+"Figura histórica de Linux",
+"Trabajó con varias distribuciones"
+],
+dificil:[
+"Conocido como Maddog",
+"Promotor de Linux",
+"Embajador del software libre"
+],
+profesional:[
+"Maddog de Linux"
+]
+},
+
+{
+nombre:"Adam Jackson",
+normal:[
+"Desarrollador Linux",
+"Contribuidor open source",
+"Trabajó con Red Hat",
+"Influyó en software Linux",
+"Programador del ecosistema"
+],
+dificil:[
+"Desarrollador open source",
+"Trabajó con Red Hat",
+"Contribuidor Linux"
+],
+profesional:[
+"Desarrollador Linux"
+]
+},
+
+{
+nombre:"Jeremy Allison",
+normal:[
+"Desarrollador de Samba",
+"Programador open source",
+"Influyó en redes Linux",
+"Trabajó con empresas tecnológicas",
+"Contribuidor del ecosistema Linux"
+],
+dificil:[
+"Desarrollador de Samba",
+"Experto en redes Linux",
+"Programador open source"
+],
+profesional:[
+"Desarrollador de Samba"
+]
+},
+
+{
+nombre:"Volker Lanz",
+normal:[
+"Creador del instalador Calamares",
+"Programador del ecosistema Linux",
+"Contribuidor open source",
+"Trabajó en proyectos de distribuciones",
+"Influyó en instaladores Linux"
+],
+dificil:[
+"Creador de Calamares",
+"Programador Linux",
+"Contribuidor open source"
+],
+profesional:[
+"Creador de Calamares"
+]
+},
+
+{
+nombre:"Clem Lefebvre",
+normal:[
+"Creador de Linux Mint",
+"Desarrollador francés",
+"Promotor del escritorio Linux",
+"Mint es una distro muy popular",
+"Figura importante del escritorio Linux"
+],
+dificil:[
+"Creador de Linux Mint",
+"Promotor del escritorio Linux",
+"Desarrollador francés"
+],
+profesional:[
+"Creador de Linux Mint"
+]
+},
+
+{
+nombre:"Jason Evangelho",
+normal:[
+"Promotor del escritorio Linux",
+"Periodista tecnológico",
+"Divulgador del software libre",
+"Escribe sobre distribuciones",
+"Figura mediática del ecosistema Linux"
+],
+dificil:[
+"Periodista de Linux",
+"Divulgador del software libre",
+"Escritor tecnológico"
+],
+profesional:[
+"Periodista del ecosistema Linux"
+]
+},
+
+{
+nombre:"Roberto Di Cosmo",
+normal:[
+"Investigador del software libre",
+"Promotor del open source",
+"Participó en proyectos Linux",
+"Profesor universitario",
+"Figura del ecosistema open source"
+],
+dificil:[
+"Investigador open source",
+"Profesor universitario",
+"Promotor del software libre"
+],
+profesional:[
+"Investigador del software libre"
+]
+},
+
+{
+nombre:"Richard Stallman",
+normal:[
+"Fundador del movimiento del software libre",
+"Creador del proyecto GNU",
+"Fundador de la Free Software Foundation",
+"Creador del editor Emacs",
+"Activista de la libertad del software"
+],
+dificil:[
+"Creador del proyecto GNU",
+"Fundador de la FSF",
+"Creador de Emacs"
+],
+profesional:[
+"Creador del proyecto GNU"
+]
+},
+
+{
+nombre:"Miguel de Icaza",
+normal:[
+"Co-creador del escritorio GNOME",
+"Programador mexicano",
+"Promotor del software libre",
+"Creador del proyecto Mono",
+"Figura importante del escritorio Linux"
+],
+dificil:[
+"Co-creador de GNOME",
+"Creador de Mono",
+"Programador mexicano"
+],
+profesional:[
+"Co-creador de GNOME"
+]
+},
+
+{
+nombre:"Nat Friedman",
+normal:[
+"Co-creador del escritorio GNOME",
+"Programador del ecosistema Linux",
+"Trabajó en Mono",
+"Promotor del software libre",
+"Influyó en herramientas de desarrollo"
+],
+dificil:[
+"Co-creador de GNOME",
+"Programador de Mono",
+"Promotor del software libre"
+],
+profesional:[
+"Co-creador de GNOME"
+]
+},
+
+{
+nombre:"Matthias Ettrich",
+normal:[
+"Creador del proyecto KDE",
+"Programador alemán",
+"Inició uno de los escritorios más usados",
+"Figura importante del software libre",
+"Fundador del entorno KDE"
+],
+dificil:[
+"Creador de KDE",
+"Programador alemán",
+"Fundador del entorno KDE"
+],
+profesional:[
+"Creador de KDE"
+]
+},
+
+{
+nombre:"Aaron Seigo",
+normal:[
+"Desarrollador del proyecto KDE",
+"Trabajó en KDE Plasma",
+"Promotor del software libre",
+"Programador open source",
+"Contribuidor del escritorio Linux"
+],
+dificil:[
+"Desarrollador de KDE Plasma",
+"Programador open source",
+"Promotor del software libre"
+],
+profesional:[
+"Desarrollador de KDE Plasma"
+]
+},
+
+{
+nombre:"Lennart Poettering",
+normal:[
+"Creador de systemd",
+"Desarrollador de PulseAudio",
+"Trabajó con Red Hat",
+"Influyó en el sistema de inicio de Linux",
+"Figura muy conocida del ecosistema"
+],
+dificil:[
+"Creador de systemd",
+"Desarrollador de PulseAudio",
+"Trabajó con Red Hat"
+],
+profesional:[
+"Creador de systemd"
+]
+},
+
+{
+nombre:"Kay Sievers",
+normal:[
+"Co-creador de systemd",
+"Desarrollador de udev",
+"Programador del kernel y sistema",
+"Colaborador del ecosistema Linux",
+"Trabajó con Red Hat"
+],
+dificil:[
+"Co-creador de systemd",
+"Desarrollador de udev",
+"Programador Linux"
+],
+profesional:[
+"Co-creador de systemd"
+]
+},
+
+{
+nombre:"Eric Raymond",
+normal:[
+"Autor del libro La Catedral y el Bazar",
+"Promotor del open source",
+"Programador del ecosistema Linux",
+"Influyó en la cultura hacker",
+"Escritor tecnológico"
+],
+dificil:[
+"Autor de La Catedral y el Bazar",
+"Promotor del open source",
+"Programador Linux"
+],
+profesional:[
+"Autor de La Catedral y el Bazar"
+]
+},
+
+{
+nombre:"Bruce Perens",
+normal:[
+"Promotor del movimiento open source",
+"Contribuidor a Debian",
+"Activista del software libre",
+"Figura importante del open source",
+"Escritor tecnológico"
+],
+dificil:[
+"Líder del open source",
+"Contribuidor Debian",
+"Activista software libre"
+],
+profesional:[
+"Coautor de la definición Open Source"
+]
+},
+
+{
+nombre:"Brian Behlendorf",
+normal:[
+"Fundador de Apache Software Foundation",
+"Programador open source",
+"Promotor del software libre",
+"Influyó en servidores web",
+"Figura importante del internet open source"
+],
+dificil:[
+"Fundador de Apache Foundation",
+"Programador open source",
+"Influyó en servidores web"
+],
+profesional:[
+"Fundador de Apache Software Foundation"
+]
+},
+
+{
+nombre:"Jamie Zawinski",
+normal:[
+"Desarrollador de Netscape",
+"Programador open source",
+"Creador del programa xscreensaver",
+"Figura de la cultura hacker",
+"Contribuidor del software libre"
+],
+dificil:[
+"Creador de xscreensaver",
+"Programador open source",
+"Desarrollador de Netscape"
+],
+profesional:[
+"Creador de xscreensaver"
+]
+},
+
+{
+nombre:"Ulrich Drepper",
+normal:[
+"Desarrollador de glibc",
+"Programador del ecosistema GNU",
+"Trabajó con Red Hat",
+"Especialista en bibliotecas Linux",
+"Figura técnica importante"
+],
+dificil:[
+"Desarrollador de glibc",
+"Programador GNU",
+"Trabajó con Red Hat"
+],
+profesional:[
+"Desarrollador de glibc"
+]
+},
+
+{
+nombre:"Roland McGrath",
+normal:[
+"Desarrollador del proyecto GNU",
+"Contribuidor a glibc",
+"Programador open source",
+"Figura del ecosistema GNU",
+"Colaborador histórico"
+],
+dificil:[
+"Desarrollador GNU",
+"Contribuidor glibc",
+"Programador open source"
+],
+profesional:[
+"Desarrollador GNU"
+]
+},
+
+{
+nombre:"Alexandre Oliva",
+normal:[
+"Promotor del software libre",
+"Activista del proyecto GNU",
+"Programador open source",
+"Figura del movimiento libre",
+"Defensor del software libre"
+],
+dificil:[
+"Activista GNU",
+"Promotor del software libre",
+"Programador open source"
+],
+profesional:[
+"Activista del proyecto GNU"
+]
+},
+
+{
+nombre:"Federico Mena",
+normal:[
+"Co-creador de GNOME",
+"Programador del escritorio Linux",
+"Promotor del software libre",
+"Contribuidor open source",
+"Figura del entorno GNOME"
+],
+dificil:[
+"Co-creador de GNOME",
+"Programador open source",
+"Promotor del software libre"
+],
+profesional:[
+"Co-creador de GNOME"
+]
+},
+
+{
+nombre:"Havoc Pennington",
+normal:[
+"Desarrollador del proyecto GNOME",
+"Creador del sistema D-Bus",
+"Programador open source",
+"Figura técnica del escritorio Linux",
+"Trabajó con Red Hat"
+],
+dificil:[
+"Creador de D-Bus",
+"Desarrollador GNOME",
+"Programador open source"
+],
+profesional:[
+"Creador de D-Bus"
+]
+},
+
+{
+nombre:"Jonathan Blandford",
+normal:[
+"Desarrollador de GNOME",
+"Programador open source",
+"Contribuidor al escritorio Linux",
+"Figura del proyecto GNOME",
+"Trabajó en interfaces gráficas"
+],
+dificil:[
+"Desarrollador GNOME",
+"Programador open source",
+"Contribuidor Linux"
+],
+profesional:[
+"Desarrollador del proyecto GNOME"
+]
+},
+
+{
+nombre:"Christian Schaller",
+normal:[
+"Desarrollador de GNOME",
+"Trabajó con Red Hat",
+"Promotor del escritorio Linux",
+"Programador open source",
+"Figura del ecosistema Linux"
+],
+dificil:[
+"Desarrollador GNOME",
+"Trabajó con Red Hat",
+"Programador open source"
+],
+profesional:[
+"Desarrollador GNOME"
+]
+},
+
+{
+nombre:"Florian Müllner",
+normal:[
+"Desarrollador de GNOME Shell",
+"Programador open source",
+"Contribuidor del escritorio Linux",
+"Trabaja en interfaces gráficas",
+"Figura del proyecto GNOME"
+],
+dificil:[
+"Desarrollador GNOME Shell",
+"Programador open source",
+"Contribuidor GNOME"
+],
+profesional:[
+"Desarrollador de GNOME Shell"
+]
+},
+
+{
+nombre:"Bastien Nocera",
+normal:[
+"Desarrollador de GNOME",
+"Especialista en multimedia",
+"Programador open source",
+"Trabajó en reproductores Linux",
+"Figura del escritorio GNOME"
+],
+dificil:[
+"Desarrollador GNOME",
+"Especialista multimedia",
+"Programador open source"
+],
+profesional:[
+"Desarrollador multimedia GNOME"
+]
+},
+
+{
+nombre:"George Lebl",
+normal:[
+"Desarrollador del proyecto GNOME",
+"Programador open source",
+"Contribuidor del escritorio Linux",
+"Figura del ecosistema GNOME",
+"Trabajó en herramientas del sistema"
+],
+dificil:[
+"Desarrollador GNOME",
+"Programador open source",
+"Contribuidor Linux"
+],
+profesional:[
+"Desarrollador del proyecto GNOME"
+]
+},
+
+{
+nombre:"Jeff Waugh",
+normal:[
+"Líder del proyecto GNOME",
+"Promotor del software libre",
+"Programador open source",
+"Figura importante del escritorio Linux",
+"Defensor de la comunidad GNOME"
+],
+dificil:[
+"Líder del proyecto GNOME",
+"Promotor del software libre",
+"Programador open source"
+],
+profesional:[
+"Líder del proyecto GNOME"
+]
+},
+
+{
+nombre:"Owen Taylor",
+normal:[
+"Desarrollador del proyecto GNOME",
+"Programador open source",
+"Especialista en interfaces gráficas",
+"Figura técnica del escritorio Linux",
+"Trabajó con Red Hat"
+],
+dificil:[
+"Desarrollador GNOME",
+"Especialista en interfaces",
+"Programador open source"
+],
+profesional:[
+"Desarrollador GNOME"
+]
+},
+
+{
+nombre:"Tim Janik",
+normal:[
+"Desarrollador del proyecto GNOME",
+"Programador open source",
+"Contribuidor del ecosistema Linux",
+"Especialista en bibliotecas",
+"Figura técnica del software libre"
+],
+dificil:[
+"Desarrollador GNOME",
+"Programador open source",
+"Especialista en bibliotecas"
+],
+profesional:[
+"Desarrollador GNOME"
+]
+},
+
+{
+nombre:"Emmanuele Bassi",
+normal:[
+"Desarrollador del proyecto GNOME",
+"Programador open source",
+"Especialista en GTK",
+"Figura técnica del escritorio Linux",
+"Contribuidor del ecosistema"
+],
+dificil:[
+"Desarrollador GTK",
+"Programador GNOME",
+"Contribuidor open source"
+],
+profesional:[
+"Desarrollador de GTK"
+]
+},
+
+{
+nombre:"Guido van Rossum",
+normal:[
+"Creador del lenguaje Python",
+"Programador neerlandés",
+"Python es muy usado en Linux",
+"Trabajó en Google y Dropbox",
+"Figura muy influyente en programación"
+],
+dificil:[
+"Creador de Python",
+"Programador neerlandés",
+"Influyó en programación moderna"
+],
+profesional:[
+"Creador de Python"
+]
+},
+
+{
+nombre:"Brendan Eich",
+normal:[
+"Creador de JavaScript",
+"Fundador de Mozilla",
+"Influyó en la web moderna",
+"Programador estadounidense",
+"Figura importante del software libre"
+],
+dificil:[
+"Creador de JavaScript",
+"Fundador de Mozilla",
+"Programador estadounidense"
+],
+profesional:[
+"Creador de JavaScript"
+]
+},
+
+{
+nombre:"Jamie Zawinski",
+normal:[
+"Programador de Netscape",
+"Creador de xscreensaver",
+"Figura de la cultura hacker",
+"Contribuidor open source",
+"Programador del ecosistema Linux"
+],
+dificil:[
+"Creador de xscreensaver",
+"Programador open source",
+"Trabajó en Netscape"
+],
+profesional:[
+"Creador de xscreensaver"
+]
+},
+
+{
+nombre:"Larry Wall",
+normal:[
+"Creador del lenguaje Perl",
+"Programador estadounidense",
+"Perl es muy usado en sistemas Linux",
+"Figura histórica de la programación",
+"Influyó en scripting del sistema"
+],
+dificil:[
+"Creador de Perl",
+"Programador estadounidense",
+"Lenguaje usado en Linux"
+],
+profesional:[
+"Creador de Perl"
+]
+},
+
+{
+nombre:"Theo de Raadt",
+normal:[
+"Fundador de OpenBSD",
+"Programador del mundo Unix",
+"Experto en seguridad",
+"Figura del software libre",
+"Influyó en sistemas tipo Unix"
+],
+dificil:[
+"Fundador de OpenBSD",
+"Experto en seguridad",
+"Programador Unix"
+],
+profesional:[
+"Fundador de OpenBSD"
+]
+},
+
+{
+nombre:"Theo Ts'o",
+normal:[
+"Desarrollador del kernel Linux",
+"Experto en sistemas de archivos",
+"Trabajó en ext4",
+"Programador open source",
+"Figura técnica importante"
+],
+dificil:[
+"Desarrollador del kernel",
+"Experto en ext4",
+"Programador Linux"
+],
+profesional:[
+"Creador de ext4"
+]
+},
+
+{
+nombre:"Jeff Garzik",
+normal:[
+"Desarrollador del kernel Linux",
+"Programador open source",
+"Trabajó en networking",
+"Figura del ecosistema Linux",
+"Contribuidor histórico"
+],
+dificil:[
+"Desarrollador del kernel",
+"Experto en networking",
+"Programador open source"
+],
+profesional:[
+"Desarrollador del kernel Linux"
+]
+},
+
+{
+nombre:"Josh Triplett",
+normal:[
+"Desarrollador del kernel Linux",
+"Programador open source",
+"Contribuidor del ecosistema Linux",
+"Trabaja en proyectos de código abierto",
+"Figura técnica del software libre"
+],
+dificil:[
+"Desarrollador Linux",
+"Programador open source",
+"Contribuidor kernel"
+],
+profesional:[
+"Desarrollador del kernel"
+]
+},
+
+{
+nombre:"Sarah Sharp",
+normal:[
+"Desarrolladora del kernel Linux",
+"Trabajó en Intel",
+"Especialista en USB",
+"Promotora del respeto en la comunidad",
+"Figura importante del kernel"
+],
+dificil:[
+"Desarrolladora del kernel",
+"Especialista en USB",
+"Trabajó en Intel"
+],
+profesional:[
+"Experta en USB del kernel Linux"
+]
+},
+
+{
+nombre:"Dirk Hohndel",
+normal:[
+"Desarrollador open source",
+"Trabajó con Intel",
+"Colaborador de Linux",
+"Promotor del software libre",
+"Figura del ecosistema Linux"
+],
+dificil:[
+"Desarrollador open source",
+"Trabajó con Intel",
+"Promotor del software libre"
+],
+profesional:[
+"Colaborador del ecosistema Linux"
+]
+},
+
+{
+nombre:"Dan Walsh",
+normal:[
+"Experto en seguridad Linux",
+"Trabajó con Red Hat",
+"Especialista en SELinux",
+"Programador open source",
+"Figura importante en seguridad"
+],
+dificil:[
+"Experto en SELinux",
+"Trabajó con Red Hat",
+"Especialista en seguridad"
+],
+profesional:[
+"Experto en SELinux"
+]
+},
+
+{
+nombre:"Chris Wright",
+normal:[
+"Desarrollador del kernel",
+"Especialista en seguridad",
+"Trabajó en Red Hat",
+"Programador Linux",
+"Figura del ecosistema open source"
+],
+dificil:[
+"Experto en seguridad Linux",
+"Desarrollador del kernel",
+"Trabajó en Red Hat"
+],
+profesional:[
+"Desarrollador de seguridad Linux"
+]
+},
+
+{
+nombre:"Travis CI",
+normal:[
+"Plataforma de integración continua",
+"Usada en proyectos open source",
+"Automatiza pruebas",
+"Muy usada en GitHub",
+"Herramienta del desarrollo moderno"
+],
+dificil:[
+"Plataforma CI",
+"Automatiza pruebas",
+"Usada en open source"
+],
+profesional:[
+"Herramienta CI para open source"
+]
+},
+
+{
+nombre:"Linus Walleij",
+normal:[
+"Desarrollador del kernel Linux",
+"Especialista en hardware",
+"Programador open source",
+"Contribuidor del kernel",
+"Figura técnica Linux"
+],
+dificil:[
+"Desarrollador del kernel",
+"Especialista hardware",
+"Programador open source"
+],
+profesional:[
+"Desarrollador del kernel Linux"
+]
+},
+
+{
+nombre:"Michael Kerrisk",
+normal:[
+"Autor de libros de Linux",
+"Experto en programación de sistemas",
+"Escribió The Linux Programming Interface",
+"Programador Linux",
+"Figura educativa del ecosistema"
+],
+dificil:[
+"Autor de TLPI",
+"Experto en programación Linux",
+"Escritor técnico"
+],
+profesional:[
+"Autor de The Linux Programming Interface"
+]
+},
+
+{
+nombre:"Ward Cunningham",
+normal:[
+"Creador de la Wiki",
+"Programador estadounidense",
+"Influyó en desarrollo colaborativo",
+"Figura del software libre",
+"Programador histórico"
+],
+dificil:[
+"Creador de Wiki",
+"Programador estadounidense",
+"Influyó en desarrollo colaborativo"
+],
+profesional:[
+"Creador de Wiki"
+]
+},
+
+{
+nombre:"Kent Beck",
+normal:[
+"Creador de Extreme Programming",
+"Programador estadounidense",
+"Influyó en desarrollo de software",
+"Figura del software libre",
+"Autor técnico"
+],
+dificil:[
+"Creador de Extreme Programming",
+"Programador estadounidense",
+"Autor técnico"
+],
+profesional:[
+"Creador de Extreme Programming"
+]
+},
+
+{
+nombre:"Ward Vandewege",
+normal:[
+"Desarrollador Linux",
+"Administrador de sistemas",
+"Contribuidor open source",
+"Promotor del software libre",
+"Figura del ecosistema Linux"
+],
+dificil:[
+"Administrador Linux",
+"Programador open source",
+"Promotor del software libre"
+],
+profesional:[
+"Administrador Linux"
+]
+},
+
+{
+nombre:"Jim Zemlin",
+normal:[
+"Director de Linux Foundation",
+"Promotor de Linux",
+"Figura del ecosistema open source",
+"Apoya proyectos de software libre",
+"Líder organizacional"
+],
+dificil:[
+"Director de Linux Foundation",
+"Promotor Linux",
+"Líder open source"
+],
+profesional:[
+"Director de Linux Foundation"
+]
+},
+
+{
+nombre:"Amanda McPherson",
+normal:[
+"Figura de la Linux Foundation",
+"Promotora del open source",
+"Trabajó en proyectos Linux",
+"Líder tecnológica",
+"Figura del ecosistema Linux"
+],
+dificil:[
+"Líder Linux Foundation",
+"Promotora open source",
+"Figura tecnológica"
+],
+profesional:[
+"Líder de Linux Foundation"
+]
+},
+
+{
+nombre:"Stormy Peters",
+normal:[
+"Promotora del software libre",
+"Trabajó en GNOME",
+"Figura de la Linux Foundation",
+"Activista open source",
+"Apoya comunidades Linux"
+],
+dificil:[
+"Promotora GNOME",
+"Activista open source",
+"Trabajó en Linux Foundation"
+],
+profesional:[
+"Promotora del software libre"
+]
+},
+
+{
+nombre:"Karen Sandler",
+normal:[
+"Directora de Software Freedom Conservancy",
+"Activista del software libre",
+"Promotora de Linux",
+"Figura del movimiento open source",
+"Defensora del software libre"
+],
+dificil:[
+"Directora de Software Freedom Conservancy",
+"Activista open source",
+"Promotora Linux"
+],
+profesional:[
+"Directora de Software Freedom Conservancy"
+]
+},
+
+{
+nombre:"Bradley Kuhn",
+normal:[
+"Activista del software libre",
+"Trabajó en Free Software Foundation",
+"Promotor del open source",
+"Defensor de licencias libres",
+"Figura del movimiento GNU"
+],
+dificil:[
+"Activista GNU",
+"Trabajó en FSF",
+"Promotor software libre"
+],
+profesional:[
+"Activista de la FSF"
+]
+},
+
+{
+nombre:"Eben Moglen",
+normal:[
+"Abogado del software libre",
+"Defensor de licencias GPL",
+"Trabajó con la FSF",
+"Promotor del open source",
+"Figura legal del software libre"
+],
+dificil:[
+"Abogado GPL",
+"Defensor software libre",
+"Trabajó con FSF"
+],
+profesional:[
+"Abogado del software libre"
+]
+},
+
+{
+nombre:"Jon Hall",
+normal:[
+"Conocido como Maddog",
+"Promotor de Linux",
+"Embajador del software libre",
+"Figura histórica del movimiento Linux",
+"Apoya comunidades tecnológicas"
+],
+dificil:[
+"Conocido como Maddog",
+"Promotor de Linux",
+"Embajador open source"
+],
+profesional:[
+"Maddog de Linux"
+]
+}
+
+
+]
+
+function iniciarJuego(){
+
+let nombreInput=document.getElementById("nombre").value
+
+if(nombreInput.trim()==""){
+alert("Escribe tu nombre para comenzar")
+return
+}
+
+jugador=nombreInput
+
+document.getElementById("registro").style.display="none"
+
+document.getElementById("musicaFondo").play()
+
+nuevaRonda()
+
+}
+
+function nuevaRonda(){
+
+document.getElementById("juego").style.display="block"
+document.getElementById("opciones").style.display="none"
+
+let personaje=personajes[Math.floor(Math.random()*personajes.length)]
+
+personajeCorrecto=personaje.nombre
+pistasActuales=personaje[dificultad]
+
+let tiempo=10
+let indice=0
+
+document.getElementById("pista").innerText=pistasActuales[indice]
+tuxPensando()
+document.getElementById("tiempo").innerText=tiempo
+
+let barra=document.getElementById("barraTiempo")
+barra.style.width="100%"
+
+let contador=setInterval(function(){
+
+tiempo--
+barra.style.width=(tiempo*10)+"%"
+
+if(tiempo%2==0 && indice<pistasActuales.length-1){
+indice++
+document.getElementById("pista").innerText=pistasActuales[indice]
+tuxPensando()
+}
+
+document.getElementById("tiempo").innerText=tiempo
+
+if(tiempo==0){
+clearInterval(contador)
+mostrarOpciones()
+}
+
+},1000)
+
+}
+
+function mostrarOpciones(){
+
+document.getElementById("juego").style.display="none"
+document.getElementById("opciones").style.display="block"
+
+let botones=document.querySelectorAll("#opciones button")
+
+let opciones=[personajeCorrecto]
+
+while(opciones.length<4){
+
+let r=personajes[Math.floor(Math.random()*personajes.length)].nombre
+
+if(!opciones.includes(r)) opciones.push(r)
+
+}
+
+opciones.sort(()=>Math.random()-0.5)
+
+for(let i=0;i<4;i++){
+
+botones[i].innerText=opciones[i]
+
+}
+
+}
+
+function responder(boton){
+if(preguntaRespondida) return
+preguntaRespondida=true
+
+if(boton.innerText==personajeCorrecto){
+
+combo++
+
+let multiplicador=1
+
+if(combo>=5){
+multiplicador=5
+}else if(combo>=3){
+multiplicador=3
+}else if(combo>=2){
+multiplicador=2
+}
+
+puntos+=10*multiplicador
+
+document.getElementById("resultado").innerText="✅ Correcto"
+document.getElementById("correcto").play()
+tuxFeliz()
+
+document.getElementById("comboTexto").innerText="🔥 COMBO x"+multiplicador
+if(!logros.primerAcierto){
+logros.primerAcierto=true
+mostrarLogro("🥇 Primer acierto")
+}
+
+if(combo>=3 && !logros.combo3){
+logros.combo3=true
+mostrarLogro("🔥 Combo x3")
+}
+
+if(combo>=5 && !logros.combo5){
+logros.combo5=true
+mostrarLogro("🚀 Combo x5")
+}
+
+if(puntos>=100 && !logros.experto){
+logros.experto=true
+mostrarLogro("🧠 Experto Linux")
+}
+}else{
+
+combo=0
+
+document.getElementById("resultado").innerText="❌ Era "+personajeCorrecto
+document.getElementById("error").play()
+tuxTriste()
+
+document.getElementById("comboTexto").innerText=""
+
+}
+
+document.getElementById("puntos").innerText="Puntos: "+puntos
+
+}
+
+function siguienteRonda(){
+
+ronda++
+
+if(ronda>totalRondas){
+
+terminarJuego()
+return
+
+}
+
+document.getElementById("ronda").innerText="Ronda "+ronda+" / "+totalRondas
+document.getElementById("resultado").innerText=""
+
+nuevaRonda()
+
+}
+
+function terminarJuego(){
+
+document.getElementById("opciones").style.display="none"
+document.getElementById("final").style.display="block"
+
+document.getElementById("puntajeFinal").innerText="Puntaje de "+jugador+": "+puntos
+
+guardarPuntaje()
+
+}
+
+function guardarPuntaje(){
+
+let ranking=JSON.parse(localStorage.getItem("rankingLinux")) || []
+
+ranking.push({nombre:jugador,puntos:puntos})
+
+ranking.sort((a,b)=>b.puntos-a.puntos)
+
+
+localStorage.setItem("rankingLinux",JSON.stringify(ranking))
+
+}
+
+function mostrarLogro(texto){
+
+let box=document.getElementById("logroBox")
+let txt=document.getElementById("logroTexto")
+
+txt.innerText=texto
+
+box.style.display="block"
+
+setTimeout(()=>{
+box.style.display="none"
+},3000)
+
+}
+
+function mostrarRanking(){
+
+document.getElementById("final").style.display="none"
+document.getElementById("ranking").style.display="block"
+
+let ranking=JSON.parse(localStorage.getItem("rankingLinux")) || []
+
+let tabla=document.getElementById("tablaRanking")
+
+ranking.forEach(r=>{
+
+let fila=tabla.insertRow()
+
+fila.insertCell(0).innerText=r.nombre
+fila.insertCell(1).innerText=r.puntos
+
+})
+
+}
+
+</script>
+<div id="tuxReaccion" style="
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.8);
+display:none;
+justify-content:center;
+align-items:center;
+z-index:9999;
+">
+
+<img id="tuxReaccionImg" style="
+width:80%;
+max-width:600px;
+">
+
+</div>
+<div id="logroBox">
+🏆 Logro desbloqueado
+<p id="logroTexto"></p>
+</div>
+</body>
+</html>
