@@ -2232,6 +2232,8 @@ nuevaRonda()
 
 function nuevaRonda(){
 
+preguntaRespondida=false
+
 document.getElementById("juego").style.display="block"
 document.getElementById("opciones").style.display="none"
 
@@ -2424,6 +2426,8 @@ document.getElementById("ranking").style.display="block"
 let ranking=JSON.parse(localStorage.getItem("rankingLinux")) || []
 
 let tabla=document.getElementById("tablaRanking")
+
+tabla.innerHTML="<tr><th>Jugador</th><th>Puntos</th></tr>"
 
 ranking.forEach(r=>{
 
